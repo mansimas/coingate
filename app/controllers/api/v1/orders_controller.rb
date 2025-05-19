@@ -3,7 +3,7 @@ class Api::V1::OrdersController < ApplicationController
   skip_before_action :verify_authenticity_token
 
   include Authenticatable
-  before_action :authenticate_knicko
+  before_action :authenticate_knicko, only: [:create, :show, :cancel]
   before_action :validate_params, only: [:create, :show, :cancel]
   before_action :verify_coingate_ip, only: [:callback]
 
