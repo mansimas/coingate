@@ -10,7 +10,7 @@ class Api::V1::OrdersController < ApplicationController
   def create
     permitted = order_params
 
-    callback_url = url_for(controller: 'api/v1/orders', action: 'callback', only_full_url: true)
+    callback_url = url_for(controller: 'api/v1/orders', action: 'callback')
 
     coingate_params = {
       order_id:       permitted[:order_id],
