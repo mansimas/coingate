@@ -12,6 +12,7 @@ class CoingateService
     end
 
     Rails.logger.info "CoinGate API Response: Code=#{response.code}, Body=#{response.body.inspect.to_s.truncate(500)}"
+    Rails.logger.info "CoinGate payment_url: #{response['payment_url']}}"
 
     unless response.success?
       Rails.logger.error "CoinGate API Error: Code=#{response.code}, Body=#{response.body.inspect.to_s.truncate(500)}"

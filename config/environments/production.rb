@@ -4,6 +4,11 @@ Rails.application.configure do
   config.enable_reloading = false
   config.eager_load = true
 
+  config.action_controller.default_url_options = {
+    host: ENV.fetch('RENDER_EXTERNAL_HOSTNAME') { ENV.fetch('PROXY_HOST') },
+    protocol: ENV.fetch('PROXY_PROTOCOL') { 'https' }
+  }
+
   config.consider_all_requests_local = false
   config.action_controller.perform_caching = true
 

@@ -5,21 +5,25 @@ class Api::V1::OrdersController < ApplicationController
   include Authenticatable
   before_action :authenticate_knicko
   before_action :validate_params, only: [:create, :show, :cancel]
+  before_action :verify_coingate_ip, only: [:callback]
 
   def create
+    permitted = order_params
+
+    callback_url = url_for(controller: 'api/v1/orders', action: 'callback', only_full_url: true)
+
     coingate_params = {
-      order_id: order_params[:order_id],
-      price_amount: order_params[:amount],
-      price_currency: order_params[:currency],
-      callback_url: order_params[:callback_url],
-      cancel_url: order_params[:cancel_url],
-      success_url: order_params[:success_url],
-      title: order_params[:title],
-      description: order_params[:description]
+      order_id:       permitted[:order_id],
+      price_amount:   permitted[:amount],
+      price_currency: permitted[:currency],
+      callback_url:   callback_url,
+      cancel_url:     permitted[:cancel_url],
+      success_url:    permitted[:success_url],
+      title:          permitted[:title],
+      description:    permitted[:description]
     }.compact
 
     result = CoingateService.new.create_order(coingate_params)
-
     return render json: result, status: :created if result
 
     render json: { error: 'Failed to create order with CoinGate' }, status: :internal_server_error
@@ -37,6 +41,13 @@ class Api::V1::OrdersController < ApplicationController
     return render json: result if result
 
     render json: { error: "Failed to cancel order with ID #{params[:id]}" }, status: :unprocessable_entity
+  end
+
+  def callback
+    Rails.logger.info "Received CoinGate callback for order: #{params[:order_id]}"
+    Rails.logger.info "Callback details: #{params.inspect}"
+
+    head :ok
   end
 
   private
@@ -60,6 +71,52 @@ class Api::V1::OrdersController < ApplicationController
       end
     end
 
+    true
+  end
+
+  def verify_coingate_ip
+    valid_ips = Rails.cache.fetch('coingate_callback_ips_v4', expires_in: 24.hours) do
+      Rails.logger.info "Fetching CoinGate callback IPs from #{ENV['COINGATE_API_URL']}/ips-v4"
+
+      response = HTTParty.get("#{ENV['COINGATE_API_URL']}/ips-v4")
+
+      unless response.success? && response.body.present? && response.body.is_a?(String)
+        Rails.logger.error "CoinGate IP fetch error: Failed to fetch IPs. Code: #{response.code}, Body: #{response.body.inspect}"
+        next nil
+      end
+
+      begin
+        parsed_ips = JSON.parse(response.body)
+      rescue JSON::ParserError => e
+        Rails.logger.error "CoinGate IP fetch error: JSON parse error: #{e.message} for body: #{response.body}"
+        next nil
+      end
+
+      unless parsed_ips.is_a?(Array) && parsed_ips.all? { |ip| ip.is_a?(String) }
+        Rails.logger.error "CoinGate IP fetch error: Response body is not an array of strings: #{response.body}"
+        next nil
+      end
+
+      Rails.logger.info "Successfully fetched and parsed #{parsed_ips.count} CoinGate callback IPs."
+      parsed_ips
+    end
+
+    unless valid_ips.is_a?(Array) && valid_ips.present?
+      Rails.logger.error "CoinGate IP verification failed: Could not retrieve valid IP list."
+      render json: { error: 'Unauthorized IP' }, status: :unauthorized
+      return false
+    end
+
+    request_ip = request.remote_ip
+    Rails.logger.info "Verifying CoinGate callback IP: Incoming IP is #{request_ip}"
+
+    unless valid_ips.include?(request_ip)
+      Rails.logger.warn "CoinGate IP verification failed: Incoming IP #{request_ip} is not in the valid list."
+      render json: { error: 'Unauthorized IP' }, status: :unauthorized
+      return false
+    end
+
+    Rails.logger.info "CoinGate IP verification successful for IP: #{request_ip}"
     true
   end
 end
