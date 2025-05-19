@@ -159,6 +159,75 @@ Receives automated payment status updates from CoinGate.
   - `401 Unauthorized`: Request did not originate from a valid CoinGate callback IP address.
   - `500 Internal Server Error`: Error processing the callback (e.g., parsing issue).
 
+## **Deployed Application and Callback Verification**
+
+The application is deployed to Heroku at the following URL:
+
+**Heroku App URL:** <https://coingate-dabd49cb6426.herokuapp.com/>
+
+To verify that the CoinGate callback functionality is working:
+
+1. Use Postman (or a similar tool) to send a **Create Order** request to the Heroku App URL's `/api/v1/orders` endpoint (details above). Ensure you include the X-API-Key header.
+2. In the successful response from the Create Order request, note the payment_url.
+3. Open the payment_url in a web browser. This will take you to the CoinGate sandbox invoice page.
+4. On the CoinGate sandbox invoice page, use the provided buttons (e.g., "Mark as Paid") to simulate a payment status change.
+5. CoinGate's sandbox will then send a callback request to the callback URL configured during the order creation (which is the `/api/v1/orders/callback` endpoint on the Heroku app URL).
+6. The proxy application on Heroku will receive this callback. The verify_coingate_ip before_action will validate the source IP. If the IP is valid (which it should be from CoinGate's sandbox), the callback action will execute.
+7. The callback endpoint is configured to return a **200 OK** response status upon successful receipt and processing (which includes logging the callback details). While the response body is empty, the **200 OK status** indicates successful processing from the perspective of the receiving server (your proxy).
+
+This sequence demonstrates that the callback mechanism is functional and secured by IP validation on the deployed application.
+
+
+- **REQUEST DEMO**
+```
+Started POST "/api/v1/orders" for 62.80.225.156 at 2025-05-19 20:24:15 +0000
+Parameters: {
+  "order_id"=>"KNICKO-ORD-123", "amount"=>100.5, "currency"=>"USD", "callback_url"=>"http://knickoshop.com/callback", "cancel_url"=>"http://knickoshop.com/cancel", 
+  "success_url"=>"http://knickoshop.com/success", "title"=>"Clothing Order", "description"=>"Various items"
+}
+CoinGateService: Creating order. Body: {
+  "order_id":"KNICKO-ORD-123","price_amount":100.5,"price_currency":"USD",
+  "callback_url":"https://coingate-dabd49cb6426.herokuapp.com/api/v1/orders/callback","cancel_url":"http://knickoshop.com/cancel","success_url":"http://knickoshop.com/success","title":"Clothing Order",
+  "description":"Various items"
+}
+CoinGate API Response: Code=200, Body="{
+  \"id\":247096,\"status\":\"new\",\"title\":\"Clothing Order\",\"do_not_convert\":false,\"orderable_type\":\"ApiApp\",\"orderable_id\":3189,
+  \"uuid\":\"825b79f2-f576-4219-9d95-5307ab3d1d8c\",\"payment_gateway\":null,\"price_currency\":\"USD\",\"price_amount\":\"100.5\",
+  \"lightning_network\":false,\"receive_currency\":\"\",\"receive_amount\":\"0\",\"created_at\":\"2025-05-19T20:24:16+00:00\",
+  \"order_id\":\"KNICKO-ORD-123\",\"payment_url\":\"https://pay-sandbox.coingate.com/invoice/825b79f2-f57...
+}
+```
+
+- **CALLBACK DEMO**
+```
+Started POST "/api/v1/orders/callback" for 3.122.122.94 at 2025-05-19 20:24:34 +0000
+Processing by Api::V1::OrdersController#callback as */*
+Parameters: {
+  "id"=>247096, "order_id"=>"KNICKO-ORD-123", "status"=>"pending", "pay_amount"=>"0.00097073", "pay_currency"=>"BTC", 
+  "price_amount"=>"100.5", "price_currency"=>"USD", "receive_currency"=>"USDC", "receive_amount"=>"100.065373", "created_at"=>"2025-05-19T20:24:16+00:00", 
+  "token"=>"[FILTERED]", "underpaid_amount"=>"0.00097073", "overpaid_amount"=>"0", "is_refundable"=>false, "fees"=>[]
+}
+Verifying CoinGate callback IP: Incoming IP is 3.122.122.94
+CoinGate IP verification successful for IP: 3.122.122.94
+Received CoinGate callback for order: KNICKO-ORD-123
+at=info method=POST path="/api/v1/orders/callback" host=coingate-dabd49cb6426.herokuapp.com request_id=bbbc097f-1fc5-4b09-8b42-402fdd61adf9 fwd="3.122.122.94" dyno=web.1 connect=0ms service=3ms status=200 bytes=418 protocol=https
+```
+
+- **SECONDARY CALLBACK AFTER MARKING AS PAID**
+
+```
+Started POST "/api/v1/orders/callback" for 3.122.122.94 at 2025-05-19 20:24:38 +0000
+Processing by Api::V1::OrdersController#callback as */*
+Parameters: {
+  "id"=>247096, "order_id"=>"KNICKO-ORD-123", "status"=>"paid", "pay_amount"=>"0.00097073", "pay_currency"=>"BTC", 
+  "price_amount"=>"100.5", "price_currency"=>"USD", "receive_currency"=>"USDC", "receive_amount"=>"100.065373", "created_at"=>"2025-05-19T20:24:16+00:00", 
+  "token"=>"[FILTERED]", "underpaid_amount"=>"0.00097073", "overpaid_amount"=>"0", "is_refundable"=>false, 
+  "fees"=>[{"type"=>"processing_fee", "amount"=>"1.010761", "currency"=>{"id"=>33, "symbol"=>"USDC"}}], 
+  "paid_at"=>"2025-05-19T20:24:37+00:00"
+}
+```
+
+
 ## **Testing**
 
 Run the RSpec test suite from your project root directory:
