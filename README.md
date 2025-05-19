@@ -72,22 +72,22 @@ Replace the placeholder values with your actual credentials.
 
 **Example: Create Order (POST)**
 
-- - **URL:** `<http://localhost:3000/api/v1/orders>`
-  - **Method:** `POST`
-  - **Body (raw, JSON):**  
-    ```
-      {  
-      "order_id": "KNICKO-ORD-123",  
-      "amount": 100.50,  
-      "currency": "USD",  
-      "callback_url": "<http://knickoshop.com/callback>",  
-      "cancel_url": "<http://knickoshop.com/cancel>",  
-      "success_url": "<http://knickoshop.com/success>",  
-      "title": "Clothing Order",  
-      "description": "Various items"  
-      }  
-    ```
-      <br/>_(Note: The proxy will override the `callback_url` sent to CoinGate with its own callback endpoint URL.)_
+- **URL:** `<http://localhost:3000/api/v1/orders>`
+- **Method:** `POST`
+- **Body (raw, JSON):**  
+  ```
+    {  
+    "order_id": "KNICKO-ORD-123",  
+    "amount": 100.50,  
+    "currency": "USD",  
+    "callback_url": "<http://knickoshop.com/callback>",  
+    "cancel_url": "<http://knickoshop.com/cancel>",  
+    "success_url": "<http://knickoshop.com/success>",  
+    "title": "Clothing Order",  
+    "description": "Various items"  
+    }  
+  ```
+    <br/>_(Note: The proxy will override the `callback_url` sent to CoinGate with its own callback endpoint URL.)_
 
 ## **API Endpoints**
 
