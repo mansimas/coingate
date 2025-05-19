@@ -76,29 +76,7 @@ class Api::V1::OrdersController < ApplicationController
 
   def verify_coingate_ip
     valid_ips = Rails.cache.fetch('coingate_callback_ips_v4', expires_in: 24.hours) do
-      Rails.logger.info "Fetching CoinGate callback IPs from #{ENV['COINGATE_API_URL']}/ips-v4"
-
-      response = HTTParty.get("#{ENV['COINGATE_API_URL']}/ips-v4")
-
-      unless response.success? && response.body.present? && response.body.is_a?(String)
-        Rails.logger.error "CoinGate IP fetch error: Failed to fetch IPs. Code: #{response.code}, Body: #{response.body.inspect}"
-        next nil
-      end
-
-      begin
-        parsed_ips = JSON.parse(response.body)
-      rescue JSON::ParserError => e
-        Rails.logger.error "CoinGate IP fetch error: JSON parse error: #{e.message} for body: #{response.body}"
-        next nil
-      end
-
-      unless parsed_ips.is_a?(Array) && parsed_ips.all? { |ip| ip.is_a?(String) }
-        Rails.logger.error "CoinGate IP fetch error: Response body is not an array of strings: #{response.body}"
-        next nil
-      end
-
-      Rails.logger.info "Successfully fetched and parsed #{parsed_ips.count} CoinGate callback IPs."
-      parsed_ips
+      fetch_coingate_ips
     end
 
     unless valid_ips.is_a?(Array) && valid_ips.present?
@@ -118,5 +96,35 @@ class Api::V1::OrdersController < ApplicationController
 
     Rails.logger.info "CoinGate IP verification successful for IP: #{request_ip}"
     true
+  end
+
+  def fetch_coingate_ips
+    Rails.logger.info "Fetching CoinGate callback IPs from #{ENV['COINGATE_API_URL']}/ips-v4"
+
+    response = HTTParty.get("#{ENV['COINGATE_API_URL']}/ips-v4")
+
+    Rails.logger.info "CoinGate IP Fetch Response: Code=#{response.code}"
+    Rails.logger.info "CoinGate IP Fetch Response: Headers=#{response.headers.inspect}"
+    Rails.logger.info "CoinGate IP Fetch Response: Body=#{response.body.inspect.to_s.truncate(500)}"
+
+    unless response.success? && response.body.present? && response.body.is_a?(String)
+      Rails.logger.error "CoinGate IP fetch error: Failed to fetch IPs. Code: #{response.code}, Body: #{response.body.inspect}"
+      return nil
+    end
+
+    begin
+      parsed_ips = JSON.parse(response.body)
+    rescue JSON::ParserError => e
+      Rails.logger.error "CoinGate IP fetch error: JSON parse error: #{e.message} for body: #{response.body}"
+      return nil
+    end
+
+    unless parsed_ips.is_a?(Array) && parsed_ips.all? { |ip| ip.is_a?(String) }
+      Rails.logger.error "CoinGate IP fetch error: Response body is not an array of strings: #{response.body}"
+      return nil
+    end
+
+    Rails.logger.info "Successfully fetched and parsed #{parsed_ips.count} CoinGate callback IPs."
+    parsed_ips
   end
 end
